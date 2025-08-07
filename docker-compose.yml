@@ -1,0 +1,13 @@
+version: '3.8' # docker-compose 파일 버전
+
+services: # 이 파일로 실행할 서비스들의 목록
+  mongodb: # 서비스 이름 (우리가 정함)
+    image: mongo:latest # 사용할 이미지 (mongo 공식 최신 버전)
+    container_name: qnahub-mongo # 컨테이너 이름
+    ports:
+      - "27017:27017" # 포트 연결
+    volumes:
+      - mongo-data:/data/db # 데이터 영속성을 위한 볼륨 설정
+
+volumes: # 위에서 사용한 볼륨을 정의
+  mongo-data:
