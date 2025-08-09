@@ -12,3 +12,8 @@ __pycache__/
 
 # 기타
 *.log
+
+# IDE-specific files
+.idea/
+.vscode/
+*.iml
