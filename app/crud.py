@@ -102,8 +102,9 @@ async def create_raw_question(db: AsyncIOMotorDatabase,
     return models.RawQuestionInDB(**created_question)
 
 
-async def get_raw_questions_by_status(db: AsyncIOMotorDatabase, status: models.RawQuestionStatus, limit: int = 100) -> \
-List[models.RawQuestionInDB]:
+async def get_raw_questions_by_status(
+    db: AsyncIOMotorDatabase, status: models.RawQuestionStatus, limit: int = 100
+) -> List[models.RawQuestionInDB]:
     """특정 상태의 Raw 질문들을 조회합니다."""
     questions = []
     cursor = db[RAW_QUESTIONS_COLLECTION].find({"status": status.value}).limit(limit)

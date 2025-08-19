@@ -90,15 +90,6 @@ async def run_question_processing_pipeline():
             representative_questions_data=representative_questions_data,
             processed_raw_questions=pending_questions
         )
-
-        # 여기에 ai_response_text (JSON 형식의 문자열)를 파싱해서
-        # crud.create_representative_question() 같은 함수를 호출하여 DB에 저장하고,
-        # 사용된 raw 질문들의 status를 'processed'로 업데이트하는 로직이 들어갑니다.
-        # 예:
-        # import json
-        # representative_questions = json.loads(ai_response_text)
-        # await crud.save_representative_questions_and_update_raw_status(db, representative_questions, pending_questions)
-
         print("[AI Pipeline] 대표 질문 생성 및 저장이 완료되었습니다.")
 
     except json.JSONDecodeError:
