@@ -1,5 +1,6 @@
 import google.generativeai as genai
 import os
+from typing import Tuple
 
 # --------------------------------------------------------------------------
 # 1. AI 모델 초기화 및 설정
@@ -23,7 +24,7 @@ except (ValueError, TypeError) as e:
 MODEL = genai.GenerativeModel('gemini-1.5-flash')
 
 
-async def validate_question_content(content: str) -> (bool, str):
+async def validate_question_content(content: str) -> Tuple[bool, str]:
     """
     AI를 이용해 질문 내용이 유효한지 검사합니다.
     반환값: (True/False, "이유")
