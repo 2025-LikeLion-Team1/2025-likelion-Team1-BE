@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .routers import community, questions, answers
@@ -47,13 +48,32 @@ async def lifespan(app: FastAPI):
 # FastAPI 애플리케이션 생성 및 설정
 # --------------------------------------------------------------------------
 
-# 1. FastAPI 앱 객체를 생성하면서, 위에서 정의한 lifespan을 등록합니다.
+# FastAPI 앱 객체를 생성하면서, 위에서 정의한 lifespan을 등록합니다.
 app = FastAPI(lifespan=lifespan)
 
-# 2. 각 기능별로 만든 라우터들을 앱에 포함시킵니다.
-app.include_router(community.router)
-app.include_router(questions.router)
-app.include_router(answers.router)
+# --- CORS 미들웨어 설정 ---
+# 허용할 출처(origin) 목록. 로컬 프론트엔드 개발 서버 주소를 넣습니다.
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    # 나중에 실제 프론트엔드 도메인을 추가합니다.
+    # "http://qnahub.xyz",
+    # "https://qnahub.xyz",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # 모든 HTTP 메소드 허용
+    allow_headers=["*"], # 모든 HTTP 헤더 허용
+)
+
+# --- 라우터 등록 (prefix="/api" 추가) ---
+# 이제 모든 API 경로는 /api 로 시작됩니다.
+app.include_router(community.router, prefix="/api")
+app.include_router(questions.router, prefix="/api")
+app.include_router(answers.router, prefix="/api")
 
 
 # 3. 루트 경로("/")에 대한 기본 API를 정의합니다.
