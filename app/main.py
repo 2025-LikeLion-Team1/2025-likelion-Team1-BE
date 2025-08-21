@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from .routers import community, questions # questions 라우터 임포트
+from .routers import community, questions, answers
 from .tasks import ai_pipeline
 
 # --------------------------------------------------------------------------
@@ -52,7 +52,8 @@ app = FastAPI(lifespan=lifespan)
 
 # 2. 각 기능별로 만든 라우터들을 앱에 포함시킵니다.
 app.include_router(community.router)
-app.include_router(questions.router)  # 새로 추가한 questions 라우터
+app.include_router(questions.router)
+app.include_router(answers.router)
 
 
 # 3. 루트 경로("/")에 대한 기본 API를 정의합니다.

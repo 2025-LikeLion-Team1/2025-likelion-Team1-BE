@@ -85,10 +85,15 @@ class Post(PostBase):
 # Raw Question (사용자의 날것 질문) 모델
 # --------------------------------------------------------------------------
 class RawQuestionStatus(str, Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    PROCESSED = "processed"
-    REJECTED = "rejected"
+    # --- 질문 접수 단계 ---
+    PENDING = "pending"  # AI 파이프라인 처리를 기다리는 중
+
+    # --- AI 처리 단계 ---
+    REJECTED = "rejected"  # AI 필터링에 의해 부적합 판정을 받음
+    REPRESENTED = "represented"  # ★★★ 대표 질문으로 '종합'됨
+
+    # --- 답변 완료 단계 ---
+    ANSWERED = "answered"  # ★★★ 내 질문이 포함된 대표 질문에 '답변이 완료'됨
 
 
 class RawQuestionBase(BaseModel):
@@ -131,6 +136,46 @@ class RepresentativeQuestionInDB(RepresentativeQuestionBase):
 
 class RepresentativeQuestion(RepresentativeQuestionBase):
     id: PyObjectId = Field(alias="_id")
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+# --------------------------------------------------------------------------
+# Answer (대표 질문에 대한 답변) 모델
+# --------------------------------------------------------------------------
+class AnswerBase(BaseModel):
+    content: str
+    author_id: str # 답변을 작성한 관리자/담당자의 ID
+    representative_question_id: PyObjectId # ★★★ 어떤 대표 질문에 대한 답변인지!
+
+class AnswerCreate(AnswerBase):
+    pass
+
+class AnswerInDB(AnswerBase):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class Answer(AnswerBase):
+    id: PyObjectId = Field(alias="_id")
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+# --------------------------------------------------------------------------
+# Question with Answer (질문과 답변을 함께 보여주기 위한 응답 모델)
+# --------------------------------------------------------------------------
+class QuestionAndAnswer(BaseModel):
+    # 기존에 만들어 둔 모델들을 재사용하여 구조를 만듭니다.
+    question: RepresentativeQuestion
+    answer: Answer
 
     class Config:
         from_attributes = True

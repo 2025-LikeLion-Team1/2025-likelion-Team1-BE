@@ -39,6 +39,9 @@ async def run_question_processing_pipeline():
     '''
 
     # --- Step 2: 실행 조건 확인 ---
+    print(f"[AI Pipeline DEBUG] DB 연결 정보 - URL: {database.MONGO_DATABASE_URL}, DB: {database.DATABASE_NAME}")
+    print(f"[AI Pipeline DEBUG] 현재 컬렉션에 있는 질문들: {[q.model_dump() for q in pending_questions]}")
+    
     # 실제로는 50개 이상일 때 실행하는 로직이 필요합니다.
     if not pending_questions:
         print("[AI Pipeline] 처리할 질문이 없습니다. 파이프라인을 종료합니다.")
@@ -49,21 +52,26 @@ async def run_question_processing_pipeline():
 
     # --- Step 3: 질문 요약 및 그룹핑을 위한 프롬프트 생성 ---
     # 모든 질문 내용을 하나의 문자열로 합칩니다.
-    all_question_contents = "\n".join([f"- {q.content}" for q in pending_questions])
+    # all_question_contents = "\n".join([f"- {q.content}" for q in pending_questions])
+    all_questions_with_ids = "\n".join(
+        [f'- (id: "{q.id}") {q.content}' for q in pending_questions]
+    )
 
     # Gemini AI에게 보낼 프롬프트를 정교하게 설계합니다.
     prompt = f"""
         당신은 QnAHub 커뮤니티의 질문들을 분석하는 AI 어시스턴트입니다.
-        아래에 사용자들이 남긴 여러 개의 질문 목록이 있습니다.
+        아래에 (id: "고유ID") 형식으로 사용자들이 남긴 질문 목록이 있습니다.
         이 질문들은 **이미 1차 검증을 통과한 유효한 질문들**입니다.
         이 질문들을 의미적으로 유사한 주제끼리 그룹핑하고, 각 그룹의 핵심 의도를 가장 잘 나타내는 '대표 질문'으로 요약해주세요.
 
         **[규칙]**
-        1. 결과는 반드시 JSON 형식 `[ {{"representative_question": "...", "related_questions": [...]}} ]` 이어야 합니다.
-        2. 완전히 다른 주제의 질문은 별개의 그룹으로 묶어주세요.
+        1. 결과는 반드시 JSON 형식으로 반환해야 합니다.
+        2. JSON 형식은 `[ {{"representative_question": "...", "related_question_ids": ["관련된 원본 질문 ID 1", "관련된 원본 질문 ID 2"]}} ]` 이어야 합니다.
+        3. **관련된 질문 목록에는 '내용'이 아닌, 원본 질문의 'id'를 문자열로 포함**시켜야 합니다.
+        4. 완전히 다른 주제의 질문은 별개의 그룹으로 묶어주세요.
 
         **[사용자 질문 목록]**
-        {all_question_contents}
+        {all_questions_with_ids}
 
         **[JSON 형식 결과]**
     """
