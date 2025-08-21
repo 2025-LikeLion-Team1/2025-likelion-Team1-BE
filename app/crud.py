@@ -177,7 +177,7 @@ async def save_representative_questions_and_update_raw_status(
             {"_id": {"$in": processed_raw_ids}},
             {"$set": {"status": models.RawQuestionStatus.REPRESENTED.value}}
         )
-        print(f"{len(processed_raw_ids)}개의 Raw 질문 상태가 'processed'로 업데이트되었습니다.")
+        print(f"{len(processed_raw_ids)}개의 Raw 질문 상태가 'represented'로 업데이트되었습니다.")
 
 
 # --------------------------------------------------------------------------
