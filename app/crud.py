@@ -10,6 +10,7 @@ COMMUNITY_COLLECTION = "community_posts"
 RAW_QUESTIONS_COLLECTION = "raw_questions"
 REPRESENTATIVE_QUESTIONS_COLLECTION = "representative_questions"
 ANSWERS_COLLECTION = "answers"
+LIKES_COLLECTION = "likes"
 
 # --- CREATE (생성) ---
 async def create_post(db: AsyncIOMotorDatabase, post_data: models.PostCreate) -> models.PostInDB:
@@ -414,3 +415,236 @@ async def get_all_answered_questions(db: AsyncIOMotorDatabase, skip: int = 0, li
         print(f"[DEBUG] 결과 {i}: {result}")
     
     return results
+
+
+# --- 좋아요 관련 함수들 ---
+async def get_representative_question_by_id(db: AsyncIOMotorDatabase, question_id: models.PyObjectId) -> Optional[models.RepresentativeQuestionInDB]:
+    """ID로 특정 대표 질문 하나를 조회합니다."""
+    question = await db[REPRESENTATIVE_QUESTIONS_COLLECTION].find_one({"_id": question_id})
+    if question:
+        return models.RepresentativeQuestionInDB(**question)
+    return None
+
+
+async def increment_representative_question_votes(db: AsyncIOMotorDatabase, question_id: models.PyObjectId) -> Optional[models.RepresentativeQuestionInDB]:
+    """대표 질문의 좋아요 수를 1 증가시킵니다."""
+    result = await db[REPRESENTATIVE_QUESTIONS_COLLECTION].update_one(
+        {"_id": question_id},
+        {"$inc": {"total_votes": 1}}
+    )
+    
+    if result.modified_count > 0:
+        # 업데이트된 질문을 다시 조회하여 반환
+        return await get_representative_question_by_id(db, question_id)
+    return None
+
+
+async def decrement_representative_question_votes(db: AsyncIOMotorDatabase, question_id: models.PyObjectId) -> Optional[models.RepresentativeQuestionInDB]:
+    """대표 질문의 좋아요 수를 1 감소시킵니다. (최소값은 0)"""
+    result = await db[REPRESENTATIVE_QUESTIONS_COLLECTION].update_one(
+        {"_id": question_id, "total_votes": {"$gt": 0}},  # total_votes가 0보다 클 때만 감소
+        {"$inc": {"total_votes": -1}}
+    )
+    
+    if result.modified_count > 0:
+        # 업데이트된 질문을 다시 조회하여 반환
+        return await get_representative_question_by_id(db, question_id)
+    return None
+
+
+# --- Like 관련 함수들 (쿠키/세션 기반) ---
+async def check_user_already_liked(db: AsyncIOMotorDatabase, session_id: str, target_id: models.PyObjectId, target_type: str) -> bool:
+    """사용자가 이미 해당 대상(질문 또는 답변)에 좋아요를 눌렀는지 확인합니다."""
+    print(f"[DEBUG CRUD] 중복 체크 - session_id: {session_id}, target_id: {target_id}, target_type: {target_type}")
+    print(f"[DEBUG CRUD] target_id 타입: {type(target_id)}")
+    print(f"[DEBUG CRUD] target_id 값: {target_id}")
+    
+    # ObjectId와 문자열 둘 다 시도해보자
+    from bson import ObjectId
+    
+    # 1. 원래 값으로 검색
+    existing_like = await db[LIKES_COLLECTION].find_one({
+        "session_id": session_id,
+        "target_id": target_id,
+        "target_type": target_type
+    })
+    
+    # 2. 문자열로 변환해서 검색
+    if not existing_like:
+        existing_like = await db[LIKES_COLLECTION].find_one({
+            "session_id": session_id,
+            "target_id": str(target_id),
+            "target_type": target_type
+        })
+        print(f"[DEBUG CRUD] 문자열 검색 결과: {existing_like}")
+    
+    # 3. ObjectId로 변환해서 검색
+    if not existing_like:
+        try:
+            oid = ObjectId(str(target_id))
+            existing_like = await db[LIKES_COLLECTION].find_one({
+                "session_id": session_id,
+                "target_id": oid,
+                "target_type": target_type
+            })
+            print(f"[DEBUG CRUD] ObjectId 검색 결과: {existing_like}")
+        except:
+            pass
+    
+    print(f"[DEBUG CRUD] 최종 기존 좋아요 기록: {existing_like}")
+    result = existing_like is not None
+    print(f"[DEBUG CRUD] 중복 체크 결과: {result}")
+    
+    return result
+
+
+async def create_like(db: AsyncIOMotorDatabase, like_data: models.LikeCreate) -> models.LikeInDB:
+    """좋아요 기록을 생성합니다."""
+    like_dict = like_data.model_dump()
+    print(f"[DEBUG CRUD] 좋아요 저장할 데이터: {like_dict}")
+    
+    # target_id를 명확한 ObjectId로 변환해서 저장
+    from bson import ObjectId
+    if 'target_id' in like_dict:
+        try:
+            like_dict['target_id'] = ObjectId(str(like_dict['target_id']))
+            print(f"[DEBUG CRUD] ObjectId로 변환된 target_id: {like_dict['target_id']}")
+        except:
+            print(f"[DEBUG CRUD] ObjectId 변환 실패, 원래 값 사용: {like_dict['target_id']}")
+    
+    result = await db[LIKES_COLLECTION].insert_one(like_dict)
+    print(f"[DEBUG CRUD] 저장 결과 ID: {result.inserted_id}")
+    
+    created_like = await db[LIKES_COLLECTION].find_one({"_id": result.inserted_id})
+    print(f"[DEBUG CRUD] 저장된 좋아요 기록: {created_like}")
+    
+    return models.LikeInDB(**created_like)
+
+
+async def remove_like(db: AsyncIOMotorDatabase, session_id: str, target_id: models.PyObjectId, target_type: str) -> bool:
+    """좋아요 기록을 삭제합니다."""
+    print(f"[DEBUG CRUD] 좋아요 삭제 - session_id: {session_id}, target_id: {target_id}, target_type: {target_type}")
+    
+    from bson import ObjectId
+    
+    # 1. 원래 값으로 삭제 시도
+    result = await db[LIKES_COLLECTION].delete_one({
+        "session_id": session_id,
+        "target_id": target_id,
+        "target_type": target_type
+    })
+    
+    # 2. 문자열로 변환해서 삭제 시도
+    if result.deleted_count == 0:
+        result = await db[LIKES_COLLECTION].delete_one({
+            "session_id": session_id,
+            "target_id": str(target_id),
+            "target_type": target_type
+        })
+        print(f"[DEBUG CRUD] 문자열 삭제 결과: {result.deleted_count}")
+    
+    # 3. ObjectId로 변환해서 삭제 시도
+    if result.deleted_count == 0:
+        try:
+            oid = ObjectId(str(target_id))
+            result = await db[LIKES_COLLECTION].delete_one({
+                "session_id": session_id,
+                "target_id": oid,
+                "target_type": target_type
+            })
+            print(f"[DEBUG CRUD] ObjectId 삭제 결과: {result.deleted_count}")
+        except:
+            pass
+    
+    print(f"[DEBUG CRUD] 최종 삭제된 개수: {result.deleted_count}")
+    return result.deleted_count > 0
+
+
+async def safe_increment_votes_with_like_check(db: AsyncIOMotorDatabase, session_id: str, question_id: models.PyObjectId, ip_address: str) -> Optional[models.RepresentativeQuestionInDB]:
+    """중복 좋아요를 체크하고 안전하게 좋아요 수를 증가시킵니다."""
+    # 이미 좋아요를 눌렀는지 확인
+    if await check_user_already_liked(db, session_id, question_id, "question"):
+        return None  # 이미 좋아요를 누른 경우
+    
+    # 좋아요 기록 생성
+    like_data = models.LikeCreate(
+        session_id=session_id,
+        target_id=question_id,
+        target_type="question",
+        ip_address=ip_address
+    )
+    await create_like(db, like_data)
+    
+    # 좋아요 수 증가
+    return await increment_representative_question_votes(db, question_id)
+
+
+async def safe_decrement_votes_with_like_check(db: AsyncIOMotorDatabase, session_id: str, question_id: models.PyObjectId) -> Optional[models.RepresentativeQuestionInDB]:
+    """좋아요 기록을 확인하고 안전하게 좋아요 수를 감소시킵니다."""
+    # 좋아요를 누른 기록이 있는지 확인
+    if not await check_user_already_liked(db, session_id, question_id, "question"):
+        return None  # 좋아요를 누르지 않은 경우
+    
+    # 좋아요 기록 삭제
+    await remove_like(db, session_id, question_id, "question")
+    
+    # 좋아요 수 감소
+    return await decrement_representative_question_votes(db, question_id)
+
+
+# --- Answer 좋아요 관련 함수들 ---
+async def get_answer_by_id(db: AsyncIOMotorDatabase, answer_id: models.PyObjectId) -> Optional[models.AnswerInDB]:
+    """ID로 특정 답변 하나를 조회합니다."""
+    answer = await db[ANSWERS_COLLECTION].find_one({"_id": answer_id})
+    if answer:
+        return models.AnswerInDB(**answer)
+    return None
+
+
+async def increment_answer_votes(db: AsyncIOMotorDatabase, answer_id: models.PyObjectId) -> Optional[models.AnswerInDB]:
+    """답변의 좋아요 수를 1 증가시킵니다."""
+    result = await db[ANSWERS_COLLECTION].update_one(
+        {"_id": answer_id},
+        {"$inc": {"total_votes": 1}}
+    )
+    
+    if result.modified_count > 0:
+        return await get_answer_by_id(db, answer_id)
+    return None
+
+
+async def decrement_answer_votes(db: AsyncIOMotorDatabase, answer_id: models.PyObjectId) -> Optional[models.AnswerInDB]:
+    """답변의 좋아요 수를 1 감소시킵니다. (최소값은 0)"""
+    result = await db[ANSWERS_COLLECTION].update_one(
+        {"_id": answer_id, "total_votes": {"$gt": 0}},
+        {"$inc": {"total_votes": -1}}
+    )
+    
+    if result.modified_count > 0:
+        return await get_answer_by_id(db, answer_id)
+    return None
+
+
+async def safe_increment_answer_votes_with_like_check(db: AsyncIOMotorDatabase, session_id: str, answer_id: models.PyObjectId, ip_address: str) -> Optional[models.AnswerInDB]:
+    """중복 좋아요를 체크하고 안전하게 답변 좋아요 수를 증가시킵니다."""
+    if await check_user_already_liked(db, session_id, answer_id, "answer"):
+        return None
+    
+    like_data = models.LikeCreate(
+        session_id=session_id,
+        target_id=answer_id,
+        target_type="answer",
+        ip_address=ip_address
+    )
+    await create_like(db, like_data)
+    
+    return await increment_answer_votes(db, answer_id)
+
+
+async def safe_decrement_answer_votes_with_like_check(db: AsyncIOMotorDatabase, session_id: str, answer_id: models.PyObjectId) -> Optional[models.AnswerInDB]:
+    """좋아요 기록을 확인하고 안전하게 답변 좋아요 수를 감소시킵니다."""
+    if not await check_user_already_liked(db, session_id, answer_id, "answer"):
+        return None
+    
+    await remove_like(db, session_id, answer_id, "answer")
+    return await decrement_answer_votes(db, answer_id)
