@@ -148,7 +148,8 @@ class RepresentativeQuestion(RepresentativeQuestionBase):
 class AnswerBase(BaseModel):
     content: str
     author_id: str # 답변을 작성한 관리자/담당자의 ID
-    representative_question_id: PyObjectId # ★★★ 어떤 대표 질문에 대한 답변인지!
+    representative_question_id: PyObjectId # ★★★ 어떤 대표 질문에 대한 답변인지
+    total_votes: int = 0  # 답변 좋아요 수
 
 class AnswerCreate(AnswerBase):
     pass
@@ -176,6 +177,35 @@ class QuestionAndAnswer(BaseModel):
     # 기존에 만들어 둔 모델들을 재사용하여 구조를 만듭니다.
     question: RepresentativeQuestion
     answer: Answer
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+# --------------------------------------------------------------------------
+# Like (좋아요) 모델 - 쿠키/세션 기반 (질문과 답변 모두 지원)
+# --------------------------------------------------------------------------
+class LikeBase(BaseModel):
+    session_id: str  # 세션 ID (쿠키에서 생성)
+    target_id: PyObjectId  # 좋아요 대상 ID (질문 또는 답변)
+    target_type: str  # 좋아요 대상 타입 ('question' 또는 'answer')
+    ip_address: Optional[str] = None  # 추가 보안을 위한 IP 주소
+
+class LikeCreate(LikeBase):
+    pass
+
+class LikeInDB(LikeBase):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    liked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+class Like(LikeBase):
+    id: PyObjectId = Field(alias="_id")
+    liked_at: datetime
 
     class Config:
         from_attributes = True

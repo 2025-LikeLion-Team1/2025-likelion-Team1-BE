@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from .routers import community, questions, answers
+from .routers import community, questions, answers, likes
 from .tasks import ai_pipeline
 
 # --------------------------------------------------------------------------
@@ -74,6 +74,7 @@ app.add_middleware(
 app.include_router(community.router, prefix="/api")
 app.include_router(questions.router, prefix="/api")
 app.include_router(answers.router, prefix="/api")
+app.include_router(likes.router, prefix="/api")
 
 
 # 3. 루트 경로("/")에 대한 기본 API를 정의합니다.
