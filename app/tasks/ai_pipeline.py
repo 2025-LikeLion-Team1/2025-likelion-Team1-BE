@@ -1,6 +1,6 @@
 import json
 from .. import crud, database, models  # DB와 상호작용하기 위해 crud, models 등을 가져옵니다.
-from ..utils import ai_validator
+from ..utils.ai_client import gemini_client
 
 
 
@@ -81,8 +81,8 @@ async def run_question_processing_pipeline():
     # --- Step 4: AI 모델 호출 및 결과 처리 ---
     try:
         # 모델에 프롬프트를 보내고 응답을 생성합니다.
-        response = await ai_validator.MODEL.generate_content_async(prompt)
-        ai_response_text = response.text
+        response = await gemini_client.generate_text(prompt=prompt, pro_model=True)
+        ai_response_text = response
         print(f"[AI Pipeline] AI 응답 수신:\n{ai_response_text}")
 
         # --- 지금부터 이 코드를 추가합니다 ---

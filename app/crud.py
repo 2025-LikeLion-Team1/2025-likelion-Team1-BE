@@ -213,6 +213,17 @@ async def get_all_representative_questions(db: AsyncIOMotorDatabase, skip: int =
     return questions
 
 
+async def get_all_rep_questions_for_similarity_check(db: AsyncIOMotorDatabase, limit: int = 200) -> List[models.RepresentativeQuestionInDB]:
+    """
+    유사도 검사를 위해, status와 상관없이 모든 대표 질문을 최신순으로 가져옵니다.
+    (AI 파이프라인의 부하를 줄이기 위해 최신 200개 등으로 제한하는 것이 좋습니다.)
+    """
+    questions = []
+    cursor = db[REPRESENTATIVE_QUESTIONS_COLLECTION].find().sort("_id", -1).limit(limit)
+    async for question in cursor:
+        questions.append(models.RepresentativeQuestionInDB(**question))
+    return questions
+
 # --------------------------------------------------------------------------
 # Answer CRUD 함수
 # --------------------------------------------------------------------------

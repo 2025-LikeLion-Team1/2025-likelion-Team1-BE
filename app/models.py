@@ -101,6 +101,7 @@ class RawQuestionBase(BaseModel):
     author_id: str
     status: RawQuestionStatus = RawQuestionStatus.PENDING
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    force_submitted: Optional[bool] = None
 
 
 class RawQuestionCreate(RawQuestionBase):
