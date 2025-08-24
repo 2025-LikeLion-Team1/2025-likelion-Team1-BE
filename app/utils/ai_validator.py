@@ -1,27 +1,7 @@
-import google.generativeai as genai
-import os
+from .ai_client import gemini_client
 from typing import Tuple
 
-# --------------------------------------------------------------------------
-# 1. AI 모델 초기화 및 설정
-# --------------------------------------------------------------------------
 
-# .env 파일에서 API 키를 불러옵니다. (main.py가 아닌 여기서 직접 설정)
-# 이 파일이 독립적으로 실행될 수도 있기 때문입니다.
-try:
-    # 이 파일은 app/tasks/ 안에 있으므로, .env 파일은 두 단계 상위 폴더에 있습니다.
-    # from dotenv import load_dotenv
-    # load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
-    # 위 방식이 복잡하다면, FastAPI가 시작될 때 이미 로드되므로 그냥 os.getenv만 사용해도 됩니다.
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-    if not GOOGLE_API_KEY:
-        raise ValueError("GOOGLE_API_KEY is not set.")
-    genai.configure(api_key=GOOGLE_API_KEY)
-except (ValueError, TypeError) as e:
-    raise RuntimeError(f"Failed to configure Google AI: {e}")
-
-# 사용할 Gemini 모델을 초기화합니다.
-MODEL = genai.GenerativeModel('gemini-1.5-flash')
 
 
 async def validate_question_content(content: str) -> Tuple[bool, str]:
@@ -49,8 +29,7 @@ async def validate_question_content(content: str) -> Tuple[bool, str]:
         (예: 부적합. 단순한 감정 표현입니다.)
     """
     try:
-        response = await MODEL.generate_content_async(prompt)
-        result_text = response.text.strip()
+        result_text = await gemini_client.generate_text(prompt)
 
         if result_text.startswith("적합"):
             return True, "적합한 질문입니다."
