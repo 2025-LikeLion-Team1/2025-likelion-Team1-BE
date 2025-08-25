@@ -5,6 +5,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .routers import community, questions, answers, likes
 from .tasks import ai_pipeline
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # --------------------------------------------------------------------------
 # FastAPI 수명 주기(Lifecycle) 이벤트 핸들러
 # --------------------------------------------------------------------------
@@ -56,6 +58,10 @@ app = FastAPI(lifespan=lifespan)
 origins = [
     "http://localhost",
     "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:3003",
+    "http://localhost:3004",
     # 나중에 실제 프론트엔드 도메인을 추가합니다.
     # "http://qnahub.xyz",
     # "https://qnahub.xyz",
